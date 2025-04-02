@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Betting MVP - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">
+                <h1>NBA Betting MVP</h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('index') }}">Home</a></li>
+                    <li><a href="{{ url_for('dashboard') }}" class="active">Dashboard</a></li>
+                    <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <section class="dashboard-header">
+        <div class="container">
+            <h2>Welcome, {{ session.get('username') }}</h2>
+            <div class="risk-profile">
+                <label for="risk-profile">Risk Profile:</label>
+                <select id="risk-profile">
+                    <option value="conservative">Conservative</option>
+                    <option value="moderate" selected>Moderate</option>
+                    <option value="aggressive">Aggressive</option>
+                </select>
+                <button id="save-risk-profile" class="btn btn-sm">Save</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="dashboard-content">
+        <div class="container">
+            <div class="dashboard-grid">
+                <div class="dashboard-card upcoming-games">
+                    <h3>Upcoming Games</h3>
+                    <div id="dashboard-games" class="dashboard-games-list">
+                        <div class="loading">Loading games...</div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card game-details" id="game-details">
+                    <h3>Game Details</h3>
+                    <div class="select-game-message">Select a game to view details</div>
+                </div>
+                
+                <div class="dashboard-card parlay-builder">
+                    <h3>Parlay Builder</h3>
+                    <div id="parlay-bets" class="parlay-bets-list">
+                        <div class="no-bets">No bets added to parlay</div>
+                    </div>
+                    <div class="parlay-controls">
+                        <div class="parlay-amount">
+                            <label for="parlay-amount">Bet Amount ($):</label>
+                            <input type="number" id="parlay-amount" min="1" value="10">
+                        </div>
+                        <div class="parlay-odds">
+                            <span>Total Odds: <span id="parlay-odds-value">0</span></span>
+                            <span>Potential Payout: $<span id="parlay-payout">0.00</span></span>
+                        </div>
+                        <button id="place-parlay" class="btn btn-primary" disabled>Place Parlay</button>
+                    </div>
+                </div>
+                
+                <div class="dashboard-card my-bets">
+                    <h3>My Bets</h3>
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="single-bets">Single Bets</button>
+                        <button class="tab-btn" data-tab="parlays">Parlays</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="single-bets" class="tab-pane active">
+                            <div class="loading">Loading your bets...</div>
+                        </div>
+                        <div id="parlays" class="tab-pane">
+                            <div class="loading">Loading your parlays...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 NBA Betting MVP. This is a demonstration project.</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
