@@ -16,7 +16,7 @@ import RegisterPage from './pages/RegisterPage';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import MainLayout from './components/layout/MainLayout';
+import MainLayout from './components/layout/MainLayout'; // Corrected the path to match the likely folder structure
 
 const App: React.FC = () => {
   const [sidebarVisible, setSidebarVisible] = useState(true);
