@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -10,6 +10,23 @@ const Header: React.FC = () => {
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // Add scroll effect to header
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -18,15 +35,17 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-gray-800 border-b border-gray-700">
+    <header className={`bg-betting-card border-b border-gray-700 sticky top-0 z-50 transition-all duration-300 ${
+      scrolled ? 'shadow-lg bg-opacity-95 backdrop-blur-sm' : ''
+    }`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center">
-              <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center mr-2">
-                <span className="text-xl font-bold">B</span>
+            <Link to="/" className="flex items-center group">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-light rounded-full flex items-center justify-center mr-2 shadow-lg transform group-hover:scale-105 transition-all duration-200">
+                <span className="text-xl font-bold text-white">B</span>
               </div>
-              <span className="text-xl font-bold">NBA Betting MVP</span>
+              <span className="text-xl font-bold text-gradient">NBA Betting MVP</span>
             </Link>
           </div>
           
@@ -41,21 +60,21 @@ const Header: React.FC = () => {
                 <Link to="/dashboard" className="px-3 py-2 text-gray-300 hover:text-white transition-colors">
                   Dashboard
                 </Link>
+                <Link to="/risk-assessment" className="px-3 py-2 text-gray-300 hover:text-white transition-colors">
+                  Risk Profile
+                </Link>
                 
-                <div className="relative ml-3">
-                  <button
-                    type="button"
-                    className="flex items-center text-gray-300 hover:text-white transition-colors"
-                  >
-                    <span className="mr-2">{user?.username}</span>
-                    <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+                <div className="relative ml-3 flex items-center">
+                  <div className="flex items-center bg-betting-highlight rounded-full px-2 py-1">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center mr-2 shadow-sm">
                       {user?.username.substring(0, 1).toUpperCase()}
                     </div>
-                  </button>
+                    <span className="mr-2 text-sm font-medium">{user?.username}</span>
+                  </div>
                   
                   <button
                     onClick={handleLogout}
-                    className="ml-4 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-md text-sm transition-colors"
+                    className="ml-4 btn btn-outline text-sm"
                   >
                     Sign Out
                   </button>
@@ -71,7 +90,7 @@ const Header: React.FC = () => {
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+                  className="btn btn-primary"
                 >
                   Register
                 </Link>
@@ -105,7 +124,7 @@ const Header: React.FC = () => {
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.3 }}
-          className="md:hidden border-t border-gray-700"
+          className="md:hidden border-t border-gray-700 bg-betting-card"
         >
           <div className="px-2 pt-2 pb-3 space-y-1">
             <Link
@@ -125,10 +144,31 @@ const Header: React.FC = () => {
                 >
                   Dashboard
                 </Link>
+                <Link
+                  to="/risk-assessment"
+                  className="block px-3 py-2 text-gray-300 hover:text-white transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Risk Profile
+                </Link>
+                <Link
+                  to="/favorites"
+                  className="block px-3 py-2 text-gray-300 hover:text-white transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Favorites
+                </Link>
+                <Link
+                  to="/history"
+                  className="block px-3 py-2 text-gray-300 hover:text-white transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Betting History
+                </Link>
                 
                 <div className="px-3 py-2 flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center mr-2">
+                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center mr-2 shadow-sm">
                       {user?.username.substring(0, 1).toUpperCase()}
                     </div>
                     <span className="text-gray-300">{user?.username}</span>
@@ -136,7 +176,7 @@ const Header: React.FC = () => {
                   
                   <button
                     onClick={handleLogout}
-                    className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-md text-sm transition-colors"
+                    className="btn btn-outline text-sm"
                   >
                     Sign Out
                   </button>
@@ -153,7 +193,7 @@ const Header: React.FC = () => {
                 </Link>
                 <Link
                   to="/register"
-                  className="block px-3 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors text-center"
+                  className="block px-3 py-2 btn btn-primary text-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Register

@@ -1,9 +1,7 @@
-// src/components/visualizations/WinProbabilityChart.tsx - Real-time win probability chart
-
 import React, { useEffect, useState } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer 
+  Tooltip, Legend, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 import { useSocket } from '../../contexts/SocketContext';
 import { motion } from 'framer-motion';
@@ -29,9 +27,9 @@ interface WinProbabilityChartProps {
 const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
   gameId,
   homeTeam,
-  homeColor = '#1E40AF', // Default blue
+  homeColor = '#1E40AF', // Default primary color
   awayTeam,
-  awayColor = '#DC2626', // Default red
+  awayColor = '#D97706', // Default secondary color
   initialData = [],
   homeWinProbability,
   awayWinProbability
@@ -197,78 +195,121 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
   // Format tooltip values
   const formatProbability = (value: number) => `${(value * 100).toFixed(1)}%`;
 
+  // Calculate current win probabilities for display
+  const currentHomeProb = data.length > 0 ? data[data.length - 1].homeWinProbability : 0.5;
+  const currentAwayProb = data.length > 0 ? data[data.length - 1].awayWinProbability : 0.5;
+
   // If no data, show a loading state
   if (!data || data.length === 0) {
     return (
       <motion.div 
-        className="bg-gray-800 rounded-lg p-4 shadow-lg"
+        className="card p-4"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         <h3 className="text-xl font-bold mb-4 text-center text-white">Win Probability</h3>
         <div className="h-64 flex items-center justify-center">
-          <p className="text-gray-400">Loading probability data...</p>
+          <div className="flex flex-col items-center">
+            <svg className="animate-spin h-8 w-8 text-primary mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p className="text-gray-400">Loading probability data...</p>
+          </div>
         </div>
       </motion.div>
-    );
+    ) ;
   }
 
   return (
     <motion.div 
-      className="bg-gray-800 rounded-lg p-4 shadow-lg"
+      className="card p-4"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <h3 className="text-xl font-bold mb-4 text-center text-white">Win Probability</h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xl font-bold text-white">Win Probability</h3>
+        
+        <div className="flex space-x-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: homeColor }}></div>
+            <span className="text-sm text-gray-300">{homeTeam}: {formatProbability(currentHomeProb)}</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: awayColor }}></div>
+            <span className="text-sm text-gray-300">{awayTeam}: {formatProbability(currentAwayProb)}</span>
+          </div>
+        </div>
+      </div>
+      
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
+          <AreaChart
             data={data}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <defs>
+              <linearGradient id="homeColorGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={homeColor} stopOpacity={0.8}/>
+                <stop offset="95%" stopColor={homeColor} stopOpacity={0.1}/>
+              </linearGradient>
+              <linearGradient id="awayColorGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={awayColor} stopOpacity={0.8}/>
+                <stop offset="95%" stopColor={awayColor} stopOpacity={0.1}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
             <XAxis 
               dataKey="gameTime" 
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF' }}
+              tick={{ fill: '#9CA3AF', fontSize: 12 }}
             />
             <YAxis 
               tickFormatter={formatProbability}
               domain={[0, 1]}
               stroke="#9CA3AF"
-              tick={{ fill: '#9CA3AF' }}
+              tick={{ fill: '#9CA3AF', fontSize: 12 }}
             />
             <Tooltip 
               formatter={formatProbability}
-              contentStyle={{ backgroundColor: '#1F2937', borderColor: '#4B5563', color: '#F9FAFB' }}
-              labelStyle={{ color: '#F9FAFB' }}
+              contentStyle={{ 
+                backgroundColor: 'rgba(15, 23, 42, 0.9)', 
+                borderColor: '#334155', 
+                color: '#F9FAFB',
+                borderRadius: '0.375rem',
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+              }}
+              labelStyle={{ color: '#F9FAFB', fontWeight: 'bold', marginBottom: '0.5rem' }}
+              itemStyle={{ padding: '0.25rem 0' }}
             />
-            <Legend wrapperStyle={{ color: '#F9FAFB' }} />
-            <Line
+            <Area
               type="monotone"
               dataKey="homeWinProbability"
               name={homeTeam}
               stroke={homeColor}
               strokeWidth={2}
-              dot={{ fill: homeColor, strokeWidth: 1, r: 4 }}
-              activeDot={{ r: 6, fill: homeColor }}
+              fillOpacity={1}
+              fill="url(#homeColorGradient)"
+              activeDot={{ r: 6, fill: homeColor, strokeWidth: 1 }}
               isAnimationActive={true}
             />
-            <Line
+            <Area
               type="monotone"
               dataKey="awayWinProbability"
               name={awayTeam}
               stroke={awayColor}
               strokeWidth={2}
-              dot={{ fill: awayColor, strokeWidth: 1, r: 4 }}
-              activeDot={{ r: 6, fill: awayColor }}
+              fillOpacity={1}
+              fill="url(#awayColorGradient)"
+              activeDot={{ r: 6, fill: awayColor, strokeWidth: 1 }}
               isAnimationActive={true}
             />
-          </LineChart>
+          </AreaChart>
         </ResponsiveContainer>
       </div>
+      
       <div className="flex justify-between mt-2 text-sm text-gray-400">
         <div>Game Start</div>
         <div>Current</div>

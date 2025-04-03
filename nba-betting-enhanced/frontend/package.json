@@ -25,6 +25,7 @@
     "vite": "^4.5.11"
   },
   "scripts": {
+    "start": "vite",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
