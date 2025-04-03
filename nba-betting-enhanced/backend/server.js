@@ -1,7 +1,7 @@
 // backend/server.js
 const express = require('express');
 const http = require('http') ;
-const socketIo = require('socket.io');
+const socketIo = require('socket.io');  // Make sure this import is present
 const mongoose = require('mongoose');
 const cors = require('cors');
 const gamesRoutes = require('./routes/games');
@@ -11,38 +11,61 @@ const app = express();
 const server = http.createServer(app) ;
 const io = socketIo(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST'],
+    credentials: true
   }
-});
+}) ;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}) );
 app.use(express.json());
 
 // Routes
 app.use('/api/games', gamesRoutes);
 app.use('/api/risk-assessment', riskAssessmentRoutes);
 
-// Socket.IO connection
-io.on('connection', (socket) => {
-  console.log('New client connected');
+// Games namespace
+const gamesNamespace = io.of('/games');
+gamesNamespace.on('connection', (socket) => {
+  console.log('Client connected to games namespace');
   
   // Join game room
-  socket.on('join-game', (gameId) => {
+  socket.on('join_game', (gameId) => {
     socket.join(`game-${gameId}`);
     console.log(`Client joined game-${gameId}`);
   });
   
   // Leave game room
-  socket.on('leave-game', (gameId) => {
+  socket.on('leave_game', (gameId) => {
     socket.leave(`game-${gameId}`);
     console.log(`Client left game-${gameId}`);
   });
   
   // Disconnect
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
+    console.log('Client disconnected from games namespace');
+  });
+});
+
+// Users namespace
+const usersNamespace = io.of('/users');
+usersNamespace.on('connection', (socket) => {
+  console.log('Client connected to users namespace');
+  
+  // Authenticate user
+  socket.on('authenticate', (userId) => {
+    console.log(`User authenticated: ${userId}`);
+    socket.join(`user-${userId}`);
+  });
+  
+  // Disconnect
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from users namespace');
   });
 });
 

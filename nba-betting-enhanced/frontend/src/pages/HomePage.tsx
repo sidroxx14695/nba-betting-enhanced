@@ -85,7 +85,7 @@ const HomePage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeGames.map((game) => (
               <motion.div
-                key={game.gameId}
+              key={String(game.id)}
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
                 className="bg-gray-800 rounded-lg overflow-hidden shadow-lg cursor-pointer"
@@ -143,7 +143,7 @@ const HomePage: React.FC = () => {
                       <div className="flex justify-between text-sm">
                         <div>Win Probability:</div>
                         <div className="font-medium">
-                          {game.homeTeam.name}: {(game.predictions.winProbability.home * 100).toFixed(1)}%
+                        {game.homeTeam.name}: {typeof game.predictions.winProbability === 'number' ? (game.predictions.winProbability * 100).toFixed(1) : 'N/A'}%
                         </div>
                       </div>
                     </div>

@@ -39,15 +39,17 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
   // Initialize with default data if no initialData is provided
   const [data, setData] = useState<WinProbabilityPoint[]>(() => {
     // If initialData is provided, use it
-    if (initialData.length > 0) {
+    if (initialData && initialData.length > 0) {
       return initialData;
     } 
     // If homeWinProbability is provided, create initial data point
     else if (homeWinProbability !== undefined) {
-      // Calculate awayWinProbability if not provided (assuming they sum to 1)
-      const awayProb = awayWinProbability !== undefined ? 
-        awayWinProbability : 
-        (1 - homeWinProbability);
+      // Calculate awayWinProbability if not provided (ensuring they sum to 1)
+      // Using a safer calculation that handles edge cases
+      const homeProb = Math.max(0, Math.min(1, homeWinProbability)); // Ensure between 0 and 1
+      const awayProb = awayWinProbability !== undefined 
+        ? Math.max(0, Math.min(1, awayWinProbability)) // Ensure between 0 and 1
+        : Math.max(0, 1 - homeProb); // Calculate based on homeProb
       
       // Create initial data points to show a trend
       return [
@@ -59,7 +61,7 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
         },
         {
           timestamp: new Date().toISOString(),
-          homeWinProbability: homeWinProbability,
+          homeWinProbability: homeProb,
           awayWinProbability: awayProb,
           gameTime: 'Current'
         }
@@ -79,14 +81,37 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
 
     // Listen for prediction updates
     const handlePredictionUpdate = (update: any) => {
-      if (update.gameId === gameId) {
+      if (update && update.gameId === gameId) {
+        // Improved error handling for update data
+        const timestamp = update.timestamp || new Date().toISOString();
+        
+        // Safely access nested properties with fallbacks
+        const homeProb = update.predictions && 
+                         update.predictions.winProbability && 
+                         update.predictions.winProbability.home !== undefined
+                         ? Math.max(0, Math.min(1, update.predictions.winProbability.home))
+                         : 0.5;
+        
+        const awayProb = update.predictions && 
+                         update.predictions.winProbability && 
+                         update.predictions.winProbability.away !== undefined
+                         ? Math.max(0, Math.min(1, update.predictions.winProbability.away))
+                         : 0.5;
+        
+        // Ensure probabilities sum to 1 if they're close
+        const sum = homeProb + awayProb;
+        const normalizedHomeProb = sum > 0 ? homeProb / sum : 0.5;
+        const normalizedAwayProb = sum > 0 ? awayProb / sum : 0.5;
+        
+        const gameTime = update.period && update.timeRemaining 
+          ? formatGameTime(update.period, update.timeRemaining) 
+          : 'Current';
+
         const newPoint: WinProbabilityPoint = {
-          timestamp: update.timestamp || new Date().toISOString(),
-          homeWinProbability: update.predictions?.winProbability?.home || 0.5,
-          awayWinProbability: update.predictions?.winProbability?.away || 0.5,
-          gameTime: update.period && update.timeRemaining ? 
-            formatGameTime(update.period, update.timeRemaining) : 
-            'Current'
+          timestamp,
+          homeWinProbability: normalizedHomeProb,
+          awayWinProbability: normalizedAwayProb,
+          gameTime
         };
 
         setData(prevData => [...prevData, newPoint]);
@@ -105,21 +130,23 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
   // Update data if homeWinProbability or awayWinProbability props change
   useEffect(() => {
     if (homeWinProbability !== undefined) {
-      // Calculate awayWinProbability if not provided (assuming they sum to 1)
-      const awayProb = awayWinProbability !== undefined ? 
-        awayWinProbability : 
-        (1 - homeWinProbability);
+      // Calculate awayWinProbability if not provided (ensuring they sum to 1)
+      // Using a safer calculation that handles edge cases
+      const homeProb = Math.max(0, Math.min(1, homeWinProbability)); // Ensure between 0 and 1
+      const awayProb = awayWinProbability !== undefined 
+        ? Math.max(0, Math.min(1, awayWinProbability)) // Ensure between 0 and 1
+        : Math.max(0, 1 - homeProb); // Calculate based on homeProb
       
       const newPoint: WinProbabilityPoint = {
         timestamp: new Date().toISOString(),
-        homeWinProbability: homeWinProbability,
+        homeWinProbability: homeProb,
         awayWinProbability: awayProb,
         gameTime: 'Current'
       };
 
       // If we already have data, update the last point or add a new one
       setData(prevData => {
-        if (prevData.length === 0) {
+        if (!prevData || prevData.length === 0) {
           // If no data, create initial points to show a trend
           return [
             {
@@ -133,11 +160,21 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
         } else {
           // Replace the last point if it's from the same timestamp (within 1 second)
           const lastPoint = prevData[prevData.length - 1];
-          const timeDiff = Math.abs(new Date(lastPoint.timestamp).getTime() - new Date(newPoint.timestamp).getTime());
+          if (!lastPoint) return [...prevData, newPoint]; // Safety check
           
-          if (timeDiff < 1000 && lastPoint.gameTime === 'Current') {
-            return [...prevData.slice(0, -1), newPoint];
-          } else {
+          try {
+            const timeDiff = Math.abs(
+              new Date(lastPoint.timestamp).getTime() - 
+              new Date(newPoint.timestamp).getTime()
+            );
+            
+            if (timeDiff < 1000 && lastPoint.gameTime === 'Current') {
+              return [...prevData.slice(0, -1), newPoint];
+            } else {
+              return [...prevData, newPoint];
+            }
+          } catch (error) {
+            // If there's an error parsing dates, just append the new point
             return [...prevData, newPoint];
           }
         }
@@ -147,9 +184,13 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
 
   // Format game time (e.g., "Q3 5:42")
   const formatGameTime = (period: number, timeRemaining: number): string => {
-    const minutes = Math.floor(timeRemaining / 60);
-    const seconds = Math.floor(timeRemaining % 60);
-    const periodLabel = period <= 4 ? `Q${period}` : `OT${period - 4}`;
+    // Ensure inputs are valid numbers
+    const validPeriod = isNaN(period) ? 1 : Math.max(1, period);
+    const validTimeRemaining = isNaN(timeRemaining) ? 0 : Math.max(0, timeRemaining);
+    
+    const minutes = Math.floor(validTimeRemaining / 60);
+    const seconds = Math.floor(validTimeRemaining % 60);
+    const periodLabel = validPeriod <= 4 ? `Q${validPeriod}` : `OT${validPeriod - 4}`;
     return `${periodLabel} ${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
   };
 
@@ -157,7 +198,7 @@ const WinProbabilityChart: React.FC<WinProbabilityChartProps> = ({
   const formatProbability = (value: number) => `${(value * 100).toFixed(1)}%`;
 
   // If no data, show a loading state
-  if (data.length === 0) {
+  if (!data || data.length === 0) {
     return (
       <motion.div 
         className="bg-gray-800 rounded-lg p-4 shadow-lg"

@@ -9,10 +9,10 @@ import { motion } from 'framer-motion';
 
 // Components
 import WinProbabilityChart from '../components/visualizations/WinProbabilityChart';
-import ScorePredictionChart from '../../ScorePredictionChart';
+import ScorePredictionChart from "../components/visualizations/ScorePredictionChart";
 
-const GameDetailPage: React.FC = () => {
-  const { gameId } = useParams<{ gameId: string }>();
+function GameDetailPage() {
+  const { gameId } = useParams<{ gameId: string; }>();
   const dispatch = useDispatch();
   const { selectedGame } = useSelector((state: RootState) => state.games);
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,7 @@ const GameDetailPage: React.FC = () => {
     const fetchGameDetails = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const response = await axios.get(`/api/games/${gameId}`);
         dispatch(selectGame(response.data));
@@ -89,16 +89,14 @@ const GameDetailPage: React.FC = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Game Details</h1>
             <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-2 ${
-                status === 'In Progress' ? 'bg-green-500' : 'bg-gray-500'
-              }`}></div>
+              <div className={`w-3 h-3 rounded-full mr-2 ${status === 'In Progress' ? 'bg-green-500' : 'bg-gray-500'}`}></div>
               <span className="text-sm font-medium">
                 {status === 'In Progress' ? 'LIVE' : status}
               </span>
             </div>
           </div>
         </div>
-        
+
         <div className="p-6">
           <div className="flex flex-col md:flex-row justify-between items-center mb-8">
             <div className="flex flex-col items-center mb-4 md:mb-0">
@@ -108,7 +106,7 @@ const GameDetailPage: React.FC = () => {
               <h2 className="text-xl font-bold">{homeTeam.name}</h2>
               <p className="text-gray-400">Home</p>
             </div>
-            
+
             <div className="flex flex-col items-center mb-4 md:mb-0">
               <div className="text-4xl font-bold mb-2">
                 {homeTeam.score} - {awayTeam.score}
@@ -122,7 +120,7 @@ const GameDetailPage: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mb-2">
                 <span className="text-2xl font-bold">{awayTeam.name.substring(0, 1)}</span>
@@ -131,7 +129,7 @@ const GameDetailPage: React.FC = () => {
               <p className="text-gray-400">Away</p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-gray-700 p-4 rounded-lg text-center">
               <p className="text-sm text-gray-400 mb-1">Home Win Probability</p>
@@ -139,7 +137,7 @@ const GameDetailPage: React.FC = () => {
                 {(predictions.winProbability.home * 100).toFixed(1)}%
               </p>
             </div>
-            
+
             <div className="bg-gray-700 p-4 rounded-lg text-center">
               <p className="text-sm text-gray-400 mb-1">Spread</p>
               <p className="text-2xl font-bold">
@@ -147,7 +145,7 @@ const GameDetailPage: React.FC = () => {
                 {predictions.spread.value.toFixed(1)}
               </p>
             </div>
-            
+
             <div className="bg-gray-700 p-4 rounded-lg text-center">
               <p className="text-sm text-gray-400 mb-1">Projected Total</p>
               <p className="text-2xl font-bold">
@@ -157,7 +155,7 @@ const GameDetailPage: React.FC = () => {
           </div>
         </div>
       </motion.div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <WinProbabilityChart
           gameId={gameId || ''}
@@ -172,9 +170,8 @@ const GameDetailPage: React.FC = () => {
               awayWinProbability: predictions.winProbability.away,
               gameTime: period <= 4 ? `Q${period}` : `OT${period - 4}`
             }
-          ]}
-        />
-        
+          ]} />
+
         <ScorePredictionChart
           gameId={gameId || ''}
           homeTeam={homeTeam.name}
@@ -182,10 +179,9 @@ const GameDetailPage: React.FC = () => {
           awayTeam={awayTeam.name}
           awayColor="#DC2626"
           currentHomeScore={homeTeam.score}
-          currentAwayScore={awayTeam.score}
-        />
+          currentAwayScore={awayTeam.score} />
       </div>
-      
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -193,7 +189,7 @@ const GameDetailPage: React.FC = () => {
         className="bg-gray-800 rounded-lg p-6 shadow-lg"
       >
         <h2 className="text-xl font-bold mb-4">Betting Odds</h2>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-700">
@@ -221,12 +217,11 @@ const GameDetailPage: React.FC = () => {
                   {selectedGame.odds.live?.spread || selectedGame.odds.pregame?.spread || '-'}
                 </td>
                 <td className="px-4 py-3 text-right font-medium">
-                  {selectedGame.odds.live?.spread ? 
-                    `+${Math.abs(selectedGame.odds.live.spread)}` : 
-                    selectedGame.odds.pregame?.spread ? 
-                      `+${Math.abs(selectedGame.odds.pregame.spread)}` : 
-                      '-'
-                  }
+                  {selectedGame.odds.live?.spread ?
+                    `+${Math.abs(selectedGame.odds.live.spread)}` :
+                    selectedGame.odds.pregame?.spread ?
+                      `+${Math.abs(selectedGame.odds.pregame.spread)}` :
+                      '-'}
                 </td>
                 <td className="px-4 py-3 text-right">-</td>
               </tr>
@@ -244,6 +239,6 @@ const GameDetailPage: React.FC = () => {
       </motion.div>
     </div>
   );
-};
+}
 
 export default GameDetailPage;

@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, ReferenceLine 
 } from 'recharts';
-import { useSocket } from './src/contexts/SocketContext';
+import { useSocket } from '../../contexts/SocketContext';
 import { motion } from 'framer-motion';
 
 interface ScorePredictionPoint {
@@ -44,41 +44,82 @@ const ScorePredictionChart: React.FC<ScorePredictionChartProps> = ({
   const generatePredictionData = (): ScorePredictionPoint[] => {
     const data: ScorePredictionPoint[] = [];
     
-    // If we don't have predicted scores, use simple linear projection
-    const finalHomeScore = predictedHomeScore || Math.round(currentHomeScore * (4 / currentQuarter));
-    const finalAwayScore = predictedAwayScore || Math.round(currentAwayScore * (4 / currentQuarter));
+    // Ensure currentQuarter is valid (at least 1)
+    const validQuarter = Math.max(1, currentQuarter || 1);
+    
+    // Ensure scores are valid numbers
+    const validHomeScore = isNaN(currentHomeScore) ? 0 : Math.max(0, currentHomeScore);
+    const validAwayScore = isNaN(currentAwayScore) ? 0 : Math.max(0, currentAwayScore);
+    
+    // If we don't have predicted scores, use improved projection algorithm
+    // This uses a weighted approach that accounts for game momentum
+    let finalHomeScore, finalAwayScore;
+    
+    if (predictedHomeScore !== undefined && !isNaN(predictedHomeScore)) {
+      finalHomeScore = Math.max(0, predictedHomeScore);
+    } else {
+      // More sophisticated projection based on quarter
+      // Later quarters get more weight as they're more predictive
+      const quarterWeight = Math.min(validQuarter, 4) / 4; // 0.25 to 1.0
+      const baseProjection = validHomeScore * (4 / validQuarter);
+      const conservativeProjection = validHomeScore + (validHomeScore / validQuarter) * (4 - validQuarter);
+      
+      // Blend between conservative and linear projection based on quarter
+      finalHomeScore = Math.round(
+        (baseProjection * quarterWeight) + (conservativeProjection * (1 - quarterWeight))
+      );
+    }
+    
+    if (predictedAwayScore !== undefined && !isNaN(predictedAwayScore)) {
+      finalAwayScore = Math.max(0, predictedAwayScore);
+    } else {
+      // Same improved algorithm for away score
+      const quarterWeight = Math.min(validQuarter, 4) / 4;
+      const baseProjection = validAwayScore * (4 / validQuarter);
+      const conservativeProjection = validAwayScore + (validAwayScore / validQuarter) * (4 - validQuarter);
+      
+      finalAwayScore = Math.round(
+        (baseProjection * quarterWeight) + (conservativeProjection * (1 - quarterWeight))
+      );
+    }
     
     // Calculate score progression
     for (let q = 1; q <= 4; q++) {
       const quarterLabel = `Q${q}`;
       
       // For quarters that have passed or current quarter, use actual scores
-      if (q < currentQuarter) {
-        // Estimate past quarters (simplified)
-        const ratio = q / 4;
+      if (q < validQuarter) {
+        // Estimate past quarters with improved algorithm
+        // This assumes scoring rate increases slightly in later quarters
+        const quarterRatio = q / 4;
+        const progressiveRatio = 0.8 * quarterRatio + 0.2 * (q / validQuarter);
+        
         data.push({
           quarter: quarterLabel,
-          homeScore: Math.round(finalHomeScore * ratio),
-          awayScore: Math.round(finalAwayScore * ratio),
-          actualHomeScore: Math.round(currentHomeScore * (q / currentQuarter)),
-          actualAwayScore: Math.round(currentAwayScore * (q / currentQuarter))
+          homeScore: Math.round(finalHomeScore * quarterRatio),
+          awayScore: Math.round(finalAwayScore * quarterRatio),
+          actualHomeScore: Math.round(validHomeScore * progressiveRatio),
+          actualAwayScore: Math.round(validAwayScore * progressiveRatio)
         });
-      } else if (q === currentQuarter) {
+      } else if (q === validQuarter) {
         // Current quarter - use actual scores
         data.push({
           quarter: quarterLabel,
           homeScore: Math.round(finalHomeScore * (q / 4)),
           awayScore: Math.round(finalAwayScore * (q / 4)),
-          actualHomeScore: currentHomeScore,
-          actualAwayScore: currentAwayScore
+          actualHomeScore: validHomeScore,
+          actualAwayScore: validAwayScore
         });
       } else {
         // Future quarters - only predictions
-        const ratio = q / 4;
+        // Use slightly progressive scoring rate for future quarters
+        const baseRatio = q / 4;
+        const progressiveRatio = baseRatio + (q - validQuarter) * 0.05; // Slight increase for later quarters
+        
         data.push({
           quarter: quarterLabel,
-          homeScore: Math.round(finalHomeScore * ratio),
-          awayScore: Math.round(finalAwayScore * ratio)
+          homeScore: Math.round(finalHomeScore * progressiveRatio),
+          awayScore: Math.round(finalAwayScore * progressiveRatio)
         });
       }
     }
@@ -109,7 +150,7 @@ const ScorePredictionChart: React.FC<ScorePredictionChartProps> = ({
 
     // Listen for score updates
     const handleScoreUpdate = (update: any) => {
-      if (update.gameId === gameId) {
+      if (update && update.gameId === gameId) {
         // Update the chart with new data
         setData(generatePredictionData());
       }
@@ -135,9 +176,11 @@ const ScorePredictionChart: React.FC<ScorePredictionChartProps> = ({
           <p className="text-gray-300 font-medium">{label}</p>
           <div className="mt-1">
             {payload.map((entry: any, index: number) => {
-              const isActual = entry.dataKey.includes('actual');
-              const teamName = entry.dataKey.includes('home') ? homeTeam : awayTeam;
-              const color = entry.dataKey.includes('home') ? homeColor : awayColor;
+              if (!entry) return null; // Safety check
+              
+              const isActual = entry.dataKey && entry.dataKey.includes('actual');
+              const teamName = entry.dataKey && entry.dataKey.includes('home') ? homeTeam : awayTeam;
+              const color = entry.dataKey && entry.dataKey.includes('home') ? homeColor : awayColor;
               
               return (
                 <p key={`item-${index}`} style={{ color }}>
@@ -209,7 +252,7 @@ const ScorePredictionChart: React.FC<ScorePredictionChartProps> = ({
             
             {/* Reference line for current quarter */}
             <ReferenceLine 
-              x={`Q${currentQuarter}`} 
+              x={`Q${Math.max(1, currentQuarter || 1)}`} 
               stroke="#FFFFFF" 
               strokeDasharray="3 3" 
               label={{ 

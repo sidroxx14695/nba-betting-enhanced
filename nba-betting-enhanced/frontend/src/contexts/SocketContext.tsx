@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useSelector } from 'react-redux';
-import { RootState } from '../store/slices';
+import { RootState } from '../store';
+
 
 interface SocketContextType {
   gameSocket: Socket | null;
@@ -31,7 +32,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Initialize sockets
-    const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const SOCKET_URL = 'http://localhost:5001';
+
     
     // Game namespace socket
     const gameSocketInstance = io(`${SOCKET_URL}/games`, {

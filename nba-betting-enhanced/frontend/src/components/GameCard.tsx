@@ -1,5 +1,5 @@
 import React from 'react';
-import WinProbabilityChart from '../visualizations/WinProbabilityChart'; // Corrected the path
+import WinProbabilityChart from "./visualizations/WinProbabilityChart"; // Corrected the path
 
 interface TeamInfo {
   id: string;

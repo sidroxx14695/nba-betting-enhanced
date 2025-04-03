@@ -72,8 +72,15 @@ const sampleGames = [
 ];
 
 // Get all games
-router.get('/', (req, res)  => {
+router.get('/', (req, res)   => {
   res.json(sampleGames);
+});
+
+// Get active games - Add this new endpoint
+router.get('/active', (req, res) => {
+  // Filter games that are active (In Progress)
+  const activeGames = sampleGames.filter(game => game.status === 'In Progress');
+  res.json(activeGames);
 });
 
 // Get game by ID

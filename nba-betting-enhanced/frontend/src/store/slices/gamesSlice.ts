@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { Key } from 'readline';
 
 interface Game {
+  id: Key | null | undefined;
   gameId: string;
   homeTeam: {
     id: string;
