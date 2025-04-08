@@ -1,18 +1,16 @@
+// src/store/index.ts
+
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import gamesReducer from './slices/gamesSlice';
-import userReducer from './slices/userSlice';
+import hybridDataReducer from './slices/hybridDataSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     games: gamesReducer,
-    user: userReducer
-  },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: false
-    })
+    hybridData: hybridDataReducer
+  }
 });
 
 export type RootState = ReturnType<typeof store.getState>;

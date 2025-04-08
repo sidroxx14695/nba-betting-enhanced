@@ -1,24 +1,26 @@
 import React, { useState } from 'react';
-import Sidebar from './Sidebar/sidebar';
+import Sidebar from './Sidebar/Sidebar';
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
+  const toggleCollapsed = () => {
+    setCollapsed(!collapsed);
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      <Sidebar collapsed={sidebarCollapsed} toggleCollapsed={toggleSidebar} />
+    <div className="flex">
+      {/* Sidebar */}
+      <Sidebar collapsed={collapsed} toggleCollapsed={toggleCollapsed} />
       
-      <main className={`flex-1 overflow-y-auto transition-all duration-300 bg-betting-dark`}>
+      {/* Main content */}
+      <div className={`flex-1 ${collapsed ? 'ml-16' : 'ml-64'} transition-all duration-300`}>
         {children}
-      </main>
+      </div>
     </div>
   );
 };

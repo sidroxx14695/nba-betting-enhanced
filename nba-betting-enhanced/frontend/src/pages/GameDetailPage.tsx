@@ -10,8 +10,38 @@ import { motion } from 'framer-motion';
 // Components
 import WinProbabilityChart from '../components/visualizations/WinProbabilityChart';
 import ScorePredictionChart from "../components/visualizations/ScorePredictionChart";
+import GameVisualizationDashboard from '../components/visualizations/GameVisualizationDashboard'; // Updated path to match the correct location
+import LiveScoreAnimation from '../components/visualizations/LiveScoreAnimation'; // Updated path to match the correct location
+import GameNotification from '../components/notifications/GameNotification';
 
-function GameDetailPage() {
+// Extended interfaces to match the actual data structure
+interface TeamExtended {
+  id: string;
+  name: string;
+  score: number;
+  logo?: string;
+  city?: string;
+}
+
+interface PredictionsExtended {
+  winProbability: {
+    home: number;
+    away: number;
+    confidence: number;
+  };
+  spread: {
+    value: number;
+    confidence: number;
+    favorite?: 'home' | 'away';
+  };
+  total: {
+    value: number;
+    confidence: number;
+    recommendation?: 'over' | 'under';
+  };
+}
+
+const GameDetailPage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string; }>();
   const dispatch = useDispatch();
   const { selectedGame } = useSelector((state: RootState) => state.games);
@@ -20,6 +50,39 @@ function GameDetailPage() {
   const { gameSocket } = useSocket();
   const [selectedBet, setSelectedBet] = useState<string | null>(null);
   const [betAmount, setBetAmount] = useState<number>(10);
+  const [prevOdds, setPrevOdds] = useState<{
+    homeMoneyline: number | null;
+    awayMoneyline: number | null;
+    spread: number | null;
+    total: number | null;
+  }>({
+    homeMoneyline: null,
+    awayMoneyline: null,
+    spread: null,
+    total: null
+  });
+  const [oddsChanged, setOddsChanged] = useState<{
+    homeMoneyline: boolean;
+    awayMoneyline: boolean;
+    spread: boolean;
+    total: boolean;
+  }>({
+    homeMoneyline: false,
+    awayMoneyline: false,
+    spread: false,
+    total: false
+  });
+  
+  // Game notification state
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'info' | 'success' | 'warning' | 'error';
+    isVisible: boolean;
+  }>({
+    message: '',
+    type: 'info',
+    isVisible: false
+  });
 
   useEffect(() => {
     const fetchGameDetails = async () => {
@@ -48,30 +111,165 @@ function GameDetailPage() {
     // Listen for game updates
     const handleGameUpdate = (update: any) => {
       if (update.gameId === gameId) {
+        // Check for game status changes
+        if (selectedGame && selectedGame.status !== update.status) {
+          // Game started notification
+          if (update.status === 'In Progress' && selectedGame.status !== 'In Progress') {
+            setNotification({
+              message: `Game between ${update.homeTeam.name} and ${update.awayTeam.name} has started!`,
+              type: 'info',
+              isVisible: true
+            });
+          }
+          
+          // Game ended notification
+          if (update.status === 'Final' && selectedGame.status !== 'Final') {
+            const winner = update.homeTeam.score > update.awayTeam.score ? update.homeTeam.name : update.awayTeam.name;
+            setNotification({
+              message: `Game ended! ${winner} wins!`,
+              type: 'success',
+              isVisible: true
+            });
+          }
+        }
+        
+        // Check for period changes
+        if (selectedGame && selectedGame.period !== update.period) {
+          if (update.period <= 4) {
+            setNotification({
+              message: `Quarter ${update.period} has started!`,
+              type: 'info',
+              isVisible: true
+            });
+          } else {
+            setNotification({
+              message: `Overtime ${update.period - 4} has started!`,
+              type: 'warning',
+              isVisible: true
+            });
+          }
+        }
+        
+        // Check for odds changes before updating state
+        if (selectedGame) {
+          const currentLiveOdds = selectedGame.odds.live;
+          const newLiveOdds = update.odds.live;
+          
+          // Store previous odds values
+          setPrevOdds({
+            homeMoneyline: currentLiveOdds?.homeMoneyline || null,
+            awayMoneyline: currentLiveOdds?.awayMoneyline || null,
+            spread: currentLiveOdds?.spread || null,
+            total: currentLiveOdds?.total || null
+          });
+          
+          // Check which odds have changed
+          setOddsChanged({
+            homeMoneyline: currentLiveOdds?.homeMoneyline !== newLiveOdds?.homeMoneyline && newLiveOdds?.homeMoneyline !== undefined,
+            awayMoneyline: currentLiveOdds?.awayMoneyline !== newLiveOdds?.awayMoneyline && newLiveOdds?.awayMoneyline !== undefined,
+            spread: currentLiveOdds?.spread !== newLiveOdds?.spread && newLiveOdds?.spread !== undefined,
+            total: currentLiveOdds?.total !== newLiveOdds?.total && newLiveOdds?.total !== undefined
+          });
+          
+          // Notify about significant odds changes
+          if (currentLiveOdds && newLiveOdds) {
+            const homeMoneylineDiff = Math.abs((newLiveOdds.homeMoneyline || 0) - (currentLiveOdds.homeMoneyline || 0));
+            const awayMoneylineDiff = Math.abs((newLiveOdds.awayMoneyline || 0) - (currentLiveOdds.awayMoneyline || 0));
+            
+            // Notify on significant moneyline shifts (50+ points)
+            if (homeMoneylineDiff > 50 || awayMoneylineDiff > 50) {
+              setNotification({
+                message: `Significant odds shift detected! Check the latest betting lines.`,
+                type: 'warning',
+                isVisible: true
+              });
+            }
+          }
+        }
+        
+        // Update game data in Redux
         dispatch(selectGame(update));
+        
+        // Reset odds change indicators after animation
+        setTimeout(() => {
+          setOddsChanged({
+            homeMoneyline: false,
+            awayMoneyline: false,
+            spread: false,
+            total: false
+          });
+        }, 3000);
+      }
+    };
+
+    // Listen for specific odds updates
+    const handleOddsUpdate = (data: any) => {
+      if (data.gameId === gameId && selectedGame) {
+        // Create updated game object with new odds
+        const updatedGame = {
+          ...selectedGame,
+          odds: {
+            ...selectedGame.odds,
+            live: {
+              ...selectedGame.odds.live,
+              ...data.odds
+            }
+          }
+        };
+        
+        // Store previous odds values
+        setPrevOdds({
+          homeMoneyline: selectedGame.odds.live?.homeMoneyline || null,
+          awayMoneyline: selectedGame.odds.live?.awayMoneyline || null,
+          spread: selectedGame.odds.live?.spread || null,
+          total: selectedGame.odds.live?.total || null
+        });
+        
+        // Check which odds have changed
+        setOddsChanged({
+          homeMoneyline: data.odds.homeMoneyline !== undefined && data.odds.homeMoneyline !== selectedGame.odds.live?.homeMoneyline,
+          awayMoneyline: data.odds.awayMoneyline !== undefined && data.odds.awayMoneyline !== selectedGame.odds.live?.awayMoneyline,
+          spread: data.odds.spread !== undefined && data.odds.spread !== selectedGame.odds.live?.spread,
+          total: data.odds.total !== undefined && data.odds.total !== selectedGame.odds.live?.total
+        });
+        
+        // Update game data in Redux
+        dispatch(selectGame(updatedGame));
+        
+        // Reset odds change indicators after animation
+        setTimeout(() => {
+          setOddsChanged({
+            homeMoneyline: false,
+            awayMoneyline: false,
+            spread: false,
+            total: false
+          });
+        }, 3000);
       }
     };
 
     gameSocket.on('game_update', handleGameUpdate);
+    gameSocket.on(`game:${gameId}:odds_update`, handleOddsUpdate);
 
     // Clean up on unmount
     return () => {
       gameSocket.off('game_update', handleGameUpdate);
+      gameSocket.off(`game:${gameId}:odds_update`, handleOddsUpdate);
       gameSocket.emit('leave_game', gameId);
     };
-  }, [gameSocket, gameId, dispatch]);
+  }, [gameSocket, gameId, dispatch, selectedGame]);
 
   // Handle bet selection
   const handleBetSelect = (betType: string) => {
     setSelectedBet(selectedBet === betType ? null : betType);
   };
 
-  // Handle bet amount change
-  const handleBetAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    if (!isNaN(value) && value > 0) {
-      setBetAmount(value);
-    }
+  // Handle notification close
+  const handleCloseNotification = () => {
+    setNotification(prev => ({
+      ...prev,
+      isVisible: false
+    }));
   };
 
   // Calculate potential winnings based on odds
@@ -80,6 +278,14 @@ function GameDetailPage() {
       return ((odds / 100) * betAmount).toFixed(2);
     } else {
       return ((betAmount * 100) / Math.abs(odds)).toFixed(2);
+    }
+  };
+
+  // Handle bet amount change
+  const handleBetAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value);
+    if (!isNaN(value) && value > 0) {
+      setBetAmount(value);
     }
   };
 
@@ -105,7 +311,11 @@ function GameDetailPage() {
     );
   }
 
+  // Cast to extended interfaces to handle additional properties
   const { homeTeam, awayTeam, status, period, timeRemaining, predictions } = selectedGame;
+  const homeTeamExt = homeTeam as unknown as TeamExtended;
+  const awayTeamExt = awayTeam as unknown as TeamExtended;
+  const predictionsExt = predictions as unknown as PredictionsExtended;
   
   // Determine team colors (using our theme colors for now)
   const homeTeamColor = 'team-lakers'; // This would ideally be dynamically assigned based on team
@@ -123,15 +333,17 @@ function GameDetailPage() {
     return `${mins}:${secs < 10 ? '0' + secs : secs}`;
   };
 
-  // Determine spread favorite based on spread value
-  const homeFavorite = (selectedGame.odds.live?.spread || selectedGame.odds.pregame?.spread || 0) < 0;
-  
-  // Determine total recommendation (placeholder logic - replace with your business logic)
-  const overRecommended = false; // Replace with your logic
-  const underRecommended = false; // Replace with your logic
-
   return (
     <div className="space-y-8">
+      {/* Game Notification Component */}
+      <GameNotification
+        message={notification.message}
+        type={notification.type}
+        isVisible={notification.isVisible}
+        onClose={handleCloseNotification}
+        duration={5000}
+      />
+      
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -162,32 +374,39 @@ function GameDetailPage() {
             <div className="flex flex-col items-center mb-6 md:mb-0">
               <div className="w-24 h-24 bg-betting-highlight rounded-full flex items-center justify-center mb-3 shadow-lg p-2">
                 <img 
-                  src={`https://via.placeholder.com/96?text=${homeTeam.name}`} 
+                  src={homeTeamExt.logo} 
                   alt={`${homeTeam.name} logo`} 
                   className="w-full h-full object-contain"
-                  onError={(e)  => {
+                  onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://via.placeholder.com/96?text=Team';
                   }}
                 />
               </div>
-              <h2 className="text-xl font-bold text-white">{homeTeam.name}</h2>
-              <h3 className="text-lg text-gray-300">Home</h3>
+              <h2 className="text-xl font-bold text-white">{homeTeamExt.city}</h2>
+              <h3 className="text-lg text-gray-300">{homeTeam.name}</h3>
             </div>
 
             {/* Score Display */}
             <div className="flex flex-col items-center mb-6 md:mb-0">
-              <div className="flex items-center">
-                <div className={`text-5xl font-bold ${homeTeamWinning ? 'text-status-win' : 'text-white'}`}>
-                  {homeTeam.score}
-                </div>
-                <div className="text-3xl font-bold mx-4 text-gray-400">-</div>
-                <div className={`text-5xl font-bold ${awayTeamWinning ? 'text-status-win' : 'text-white'}`}>
-                  {awayTeam.score}
-                </div>
+              {/* Live Score Animation for real-time updates */}
+              <div className="mb-2">
+                <LiveScoreAnimation
+                  gameId={gameId || ''}
+                  initialHomeScore={homeTeam.score}
+                  initialAwayScore={awayTeam.score}
+                  homeTeam={homeTeam.name}
+                  awayTeam={awayTeam.name}
+                  homeTeamColor="#1E40AF" // Using primary color
+                  awayTeamColor="#D97706" // Using secondary color
+                />
               </div>
               
               {status === 'In Progress' && (
                 <div className="mt-2 px-4 py-1 bg-betting-highlight rounded-full text-sm font-medium text-white">
+                  <span className="relative flex h-3 w-3 mr-1 inline-block">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-live opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-status-live"></span>
+                  </span>
                   {period <= 4 ? `Q${period}` : `OT${period - 4}`}
                   {' '}
                   {formatTimeRemaining(timeRemaining) }
@@ -205,16 +424,16 @@ function GameDetailPage() {
             <div className="flex flex-col items-center">
               <div className="w-24 h-24 bg-betting-highlight rounded-full flex items-center justify-center mb-3 shadow-lg p-2">
                 <img 
-                  src={`https://via.placeholder.com/96?text=${awayTeam.name}`} 
+                  src={awayTeamExt.logo} 
                   alt={`${awayTeam.name} logo`} 
                   className="w-full h-full object-contain"
-                  onError={(e)  => {
+                  onError={(e) => {
                     (e.target as HTMLImageElement).src = 'https://via.placeholder.com/96?text=Team';
                   }}
                 />
               </div>
-              <h2 className="text-xl font-bold text-white">{awayTeam.name}</h2>
-              <h3 className="text-lg text-gray-300">Away</h3>
+              <h2 className="text-xl font-bold text-white">{awayTeamExt.city}</h2>
+              <h3 className="text-lg text-gray-300">{awayTeam.name}</h3>
             </div>
           </div>
 
@@ -237,8 +456,8 @@ function GameDetailPage() {
             <div className="card p-4 text-center">
               <p className="text-sm text-gray-400 mb-1">Spread</p>
               <div className="flex justify-center items-center h-10">
-                <div className={`text-2xl font-bold ${homeFavorite ? 'text-primary' : 'text-secondary'}`}>
-                  {homeFavorite ? homeTeam.name : awayTeam.name}
+                <div className={`text-2xl font-bold ${predictionsExt.spread.favorite === 'home' ? 'text-primary' : 'text-secondary'}`}>
+                  {predictionsExt.spread.favorite === 'home' ? homeTeam.name : awayTeam.name}
                 </div>
                 <div className="text-2xl font-bold mx-2 text-white">
                   {predictions.spread.value > 0 ? '+' : ''}
@@ -254,11 +473,11 @@ function GameDetailPage() {
                   {predictions.total.value.toFixed(1)}
                 </p>
                 <div className="flex mt-1">
-                  <span className={`text-sm ${overRecommended ? 'text-status-win' : 'text-gray-400'}`}>
+                  <span className={`text-sm ${predictionsExt.total.recommendation === 'over' ? 'text-status-win' : 'text-gray-400'}`}>
                     OVER
                   </span>
                   <span className="text-sm mx-2 text-gray-500">|</span>
-                  <span className={`text-sm ${underRecommended ? 'text-status-win' : 'text-gray-400'}`}>
+                  <span className={`text-sm ${predictionsExt.total.recommendation === 'under' ? 'text-status-win' : 'text-gray-400'}`}>
                     UNDER
                   </span>
                 </div>
@@ -282,7 +501,8 @@ function GameDetailPage() {
               awayWinProbability: predictions.winProbability.away,
               gameTime: period <= 4 ? `Q${period}` : `OT${period - 4}`
             }
-          ]} />
+          ]} 
+        />
 
         <ScorePredictionChart
           gameId={gameId || ''}
@@ -291,8 +511,35 @@ function GameDetailPage() {
           awayTeam={awayTeam.name}
           awayColor="#D97706" // Using secondary color
           currentHomeScore={homeTeam.score}
-          currentAwayScore={awayTeam.score} />
+          currentAwayScore={awayTeam.score} 
+        />
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="mb-8"
+      >
+        <GameVisualizationDashboard
+          gameId={gameId || ''}
+          homeTeam={{
+            id: homeTeam.id,
+            name: homeTeam.name,
+            score: homeTeam.score,
+            logo: homeTeamExt.logo
+          }}
+          awayTeam={{
+            id: awayTeam.id,
+            name: awayTeam.name,
+            score: awayTeam.score,
+            logo: awayTeamExt.logo
+          }}
+          status={status}
+          quarter={period}
+          timeRemaining={formatTimeRemaining(timeRemaining)}
+        />
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -310,14 +557,36 @@ function GameDetailPage() {
           >
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center">
-                <div className="w-8 h-8 mr-2 bg-betting-highlight rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold">{homeTeam.name.charAt(0)}</span>
+                <div className="w-8 h-8 mr-2">
+                  <img 
+                    src={homeTeamExt.logo} 
+                    alt={`${homeTeam.name} logo`} 
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/32?text=Team';
+                    }}
+                  />
                 </div>
                 <span className="font-medium text-white">{homeTeam.name}</span>
               </div>
-              <span className="text-lg font-bold text-white">
+              <motion.span 
+                className="text-lg font-bold"
+                style={{ 
+                  color: oddsChanged.homeMoneyline ? '#10B981' : 'white',
+                  textShadow: oddsChanged.homeMoneyline ? '0 0 8px #10B981' : 'none'
+                }}
+                animate={oddsChanged.homeMoneyline ? 
+                  { scale: [1, 1.2, 1], transition: { duration: 0.5 } } : 
+                  { scale: 1 }
+                }
+              >
                 {selectedGame.odds.live?.homeMoneyline || selectedGame.odds.pregame?.homeMoneyline || '-'}
-              </span>
+                {oddsChanged.homeMoneyline && prevOdds.homeMoneyline !== null && (
+                  <span className="text-xs ml-1">
+                    {(selectedGame.odds.live?.homeMoneyline || 0)  > prevOdds.homeMoneyline ? '↑' : '↓'}
+                  </span>
+                )}
+              </motion.span>
             </div>
             <p className="text-sm text-gray-400">Moneyline</p>
           </div>
@@ -329,14 +598,36 @@ function GameDetailPage() {
           >
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center">
-                <div className="w-8 h-8 mr-2 bg-betting-highlight rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold">{awayTeam.name.charAt(0)}</span>
+                <div className="w-8 h-8 mr-2">
+                  <img 
+                    src={awayTeamExt.logo} 
+                    alt={`${awayTeam.name} logo`} 
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/32?text=Team';
+                    }}
+                  />
                 </div>
                 <span className="font-medium text-white">{awayTeam.name}</span>
               </div>
-              <span className="text-lg font-bold text-white">
+              <motion.span 
+                className="text-lg font-bold"
+                style={{ 
+                  color: oddsChanged.awayMoneyline ? '#10B981' : 'white',
+                  textShadow: oddsChanged.awayMoneyline ? '0 0 8px #10B981' : 'none'
+                }}
+                animate={oddsChanged.awayMoneyline ? 
+                  { scale: [1, 1.2, 1], transition: { duration: 0.5 } } : 
+                  { scale: 1 }
+                }
+              >
                 {selectedGame.odds.live?.awayMoneyline || selectedGame.odds.pregame?.awayMoneyline || '-'}
-              </span>
+                {oddsChanged.awayMoneyline && prevOdds.awayMoneyline !== null && (
+                  <span className="text-xs ml-1">
+                    {(selectedGame.odds.live?.awayMoneyline || 0)  > prevOdds.awayMoneyline ? '↑' : '↓'}
+                  </span>
+                )}
+              </motion.span>
             </div>
             <p className="text-sm text-gray-400">Moneyline</p>
           </div>
@@ -348,9 +639,24 @@ function GameDetailPage() {
           >
             <div className="flex justify-between items-center mb-2">
               <span className="font-medium text-white">Over</span>
-              <span className="text-lg font-bold text-white">
+              <motion.span 
+                className="text-lg font-bold"
+                style={{ 
+                  color: oddsChanged.total ? '#10B981' : 'white',
+                  textShadow: oddsChanged.total ? '0 0 8px #10B981' : 'none'
+                }}
+                animate={oddsChanged.total ? 
+                  { scale: [1, 1.2, 1], transition: { duration: 0.5 } } : 
+                  { scale: 1 }
+                }
+              >
                 {selectedGame.odds.live?.total || selectedGame.odds.pregame?.total || '-'}
-              </span>
+                {oddsChanged.total && prevOdds.total !== null && (
+                  <span className="text-xs ml-1">
+                    {(selectedGame.odds.live?.total || 0) > prevOdds.total ? '↑' : '↓'}
+                  </span>
+                )}
+              </motion.span>
             </div>
             <p className="text-sm text-gray-400">Total Points</p>
           </div>
@@ -462,6 +768,6 @@ function GameDetailPage() {
       </motion.div>
     </div>
   );
-}
+};
 
 export default GameDetailPage;

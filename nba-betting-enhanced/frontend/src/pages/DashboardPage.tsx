@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { gamesApi } from '../services/api';
 import ParlayRecommendationCard from '../components/betting/ParlayRecommendationCard';
-import GameCard from '../components/GameCard'; // Corrected the path to the GameCard component
-import ScorePredictionChart from '../components/visualizations/ScorePredictionChart'; // Updated the path to the correct location
+import GameCard from '../components/GameCard';
+import ScorePredictionChart from '../components/visualizations/ScorePredictionChart';
 
 const DashboardPage: React.FC = () => {
   const [games, setGames] = useState<any[]>([]);
@@ -24,8 +24,26 @@ const DashboardPage: React.FC = () => {
           parlays: [
             {
               legs: [
-                { team: 'Lakers', odds: -150, type: 'Moneyline' },
-                { team: 'Warriors', odds: -200, type: 'Moneyline' }
+                { 
+                  id: '1',
+                  gameId: 'game1',
+                  homeTeam: 'Lakers',
+                  awayTeam: 'Clippers',
+                  betType: 'Moneyline',
+                  selection: 'Lakers',
+                  odds: -150,
+                  confidence: 75
+                },
+                { 
+                  id: '2',
+                  gameId: 'game2',
+                  homeTeam: 'Warriors',
+                  awayTeam: 'Kings',
+                  betType: 'Moneyline',
+                  selection: 'Warriors',
+                  odds: -200,
+                  confidence: 80
+                }
               ],
               combinedOdds: +264,
               winProbability: 0.48,
@@ -106,7 +124,7 @@ const DashboardPage: React.FC = () => {
           
           {games.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2">
-              {games.map((game) => (
+              {games.map((game)  => (
                 <GameCard
                   key={game.id}
                   id={game.id}
@@ -159,11 +177,10 @@ const DashboardPage: React.FC = () => {
               {recommendations.parlays.map((parlay, index) => (
                 <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                   <ParlayRecommendationCard
-                    legs={parlay.legs}
-                    combinedOdds={parlay.combinedOdds}
-                    winProbability={parlay.winProbability}
-                    confidence={parlay.confidence}
-                    recommendedStake={parlay.recommendedStake}
+                    parlayLegs={parlay.legs}
+                    totalOdds={parlay.combinedOdds}
+                    potentialWinnings={parlay.recommendedStake * (parlay.combinedOdds / 100)}
+                    riskLevel={getRiskLevel(parlay.confidence)}
                   />
                 </div>
               ))}
@@ -209,7 +226,21 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+  ) ;
+};
+
+// Helper function to convert confidence string to risk level
+const getRiskLevel = (confidence: string): 'low' | 'medium' | 'high' => {
+  switch (confidence.toLowerCase()) {
+    case 'high':
+      return 'low';
+    case 'medium':
+      return 'medium';
+    case 'low':
+      return 'high';
+    default:
+      return 'medium';
+  }
 };
 
 export default DashboardPage;
